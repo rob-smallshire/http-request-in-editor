@@ -1,0 +1,139 @@
+// Base Symbols
+
+input_character : /[^\r\n]/
+
+alpha : /[A-Z]/
+
+digit : /[0-9]/
+
+identifier_character : alpha | digit | "-" | "_"
+
+identifier : identifier_character+
+
+
+// Line Terminators
+
+new_line : /\r/ | /\n/ | /\r\n/
+
+new_line_with_indent : new_line required_whitespace
+
+line_tail : input_character* new_line
+
+
+// Whitespaces
+
+whitespace : " " | /\t/ | /\f/
+
+optional_whitespace : whitespace*
+
+required_whitespace : whitespace+
+
+
+// Comments
+
+line_comment : ("#" line_tail)
+             | ("//" line_tail)
+
+request_separator : ("###" line_tail)
+
+// Requests File
+
+requests_file : request_separator* request request_with_separator* request_separator*
+
+request_with_separator : request_separator+ request
+
+
+// Request
+
+request: request_line new_line headers new_line [message_body] [response_handler]
+
+request_line : [method required_whitespace] request_target [required_whitespace http_version]
+
+method : "GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "PATCH" | "OPTIONS" | "TRACE"
+
+http_version : "HTTP/" digit+ "." digit+ 
+
+request_target : origin_form
+               | absolute_form
+               | asterisk_form
+
+origin_form : absolute_path ["?" query] ["#" fragment]
+
+absolute_form : [scheme "://"] hier_part ["?" query] ["#" fragment]
+
+scheme : "http" | "https"
+
+hier_part : authority [absolute_path]
+
+asterisk_form : "*"
+
+authority : host [":" port]
+
+port : digit+
+
+host : "[" ipv6_address "]"
+     | ipv4_or_reg_name
+     
+ipv6_address : /[^\/\]\r\n]+/
+
+ipv4_or_reg_name : /[^\/\:\?\#\r\n]+/
+
+absolute_path : "/"
+              | (path_separator segment)+
+              
+path_separator : "/"
+               | new_line_with_indent
+               
+segment : (/[^\/\?\#\r\n]/)*
+
+query : (/[^\#\r\n]/)* [new_line_with_indent query]
+
+fragment : (/[^\?\r\n]/)* [new_line_with_indent fragment]
+
+
+// Headers
+
+headers : (header_field new_line)*
+
+header_field : field_name ":" optional_whitespace field_value optional_whitespace
+
+field_name : /[^\:\r\n]+/
+
+field_value : line_tail [new_line_with_indent field_value]
+
+
+// Message Body
+
+message_body : messages -> data
+
+
+messages : message_line [new_line message_line]
+// TODO: | multipart_form_data
+// TODO:
+// TODO: Explicit support multipart_form_data? See RFC 2046 for a grammar
+// TODO: multipart_form_data : multipart_field [multipart_form_data] boundary
+// TODO: multipart_field : boundary (header_field new_line)* new_line [messages]
+
+message_line : /^(?!(###)|(< )|(<> ))[^\r\n]/ line_tail
+             | input_file_ref
+
+input_file_ref : "<" required_whitespace file_path
+
+file_path : line_tail
+
+// Response handler
+
+response_handler : ">" required_whitespace "{%" handler_script "}%"
+                 | ">" required_whitespace file_path
+
+                 
+handler_script : /^((?!(###)|(\%\})).)+$/
+               
+               
+// Response reference
+
+response_ref : "<>"" required-whitespace file-path
+                 
+// Start
+
+start: requests_file
